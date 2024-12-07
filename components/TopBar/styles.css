@@ -1,0 +1,39 @@
+.topbar-appBar {
+  background: linear-gradient(135deg, #4a90e2, #2a3eb1);
+  color: #ffffff;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.topbar-appBar .MuiTypography-h5 {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.topbar-appBar .MuiTypography-h6 {
+  font-style: italic;
+  font-family: 'Roboto', sans-serif;
+  color: #e0e0e0;
+}
+
+.toggleSwitch {
+  padding-left: 20px;
+}
+
+.logout-button {
+  color: white;
+  background-color: #3f51b5;
+  font-weight: bold !important;
+  background: none;
+  border: none !important;
+  cursor: pointer;
+  padding: 5px 10px !important;
+  text-decoration: none;
+  transition: color 0.3s ease;
+  font-size: 1.5rem;
+}
+
+.logout-button:hover {
+  color: #ff1a1a;
+}
