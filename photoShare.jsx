@@ -12,11 +12,6 @@ import UserPhotos from "./components/UserPhotos";
 import fetchAxios from "./lib/fetchAxiosData";
 import LoginRegister from './components/LoginRegister';
 
-function UserDetailRoute() {
-  const { userId } = useParams();
-  return <UserDetail userId={userId} />;
-}
-
 
 function PhotoShare() {
   const [contentTitle, setContentTitle] = useState("Home");
@@ -101,7 +96,7 @@ function PhotoShare() {
           </Paper>
         </Grid>
         <Grid item sm={9}>
-          <Paper className="main-grid-item">
+          <Paper className="main-grid-item" style={{overflow: 'scroll'}}>
             <Routes>
               <Route
                 path="/"
@@ -133,7 +128,7 @@ function PhotoShare() {
                 )}
               />
               <Route path="/users" element={<UserList advanceFeature={advanceFeature} />} />
-              <Route path="/users/:userId" element={<UserDetailRoute />} />
+              <Route path="/users/:userId" element={<UserDetail userId={useParams()} advanceFeature={advanceFeature} />} />
               <Route path="/photos/:userId/:photoIndex?" element={<UserPhotos userId={useParams()} advanceFeature={advanceFeature} user={user} />} />
             </Routes>
           </Paper>

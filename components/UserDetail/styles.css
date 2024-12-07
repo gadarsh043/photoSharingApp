@@ -57,5 +57,13 @@
     display: flex !important;
     margin-top: 15px !important;
   }
-
   
+  .userDetail-container img {
+    margin: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+  }
+  .userDetail-container img:hover {
+    border: 1px solid #000;
+  }

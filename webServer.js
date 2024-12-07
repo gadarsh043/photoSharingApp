@@ -357,6 +357,50 @@ app.post('/user', async function (req, res) {
   }
 });
 
+app.get('/user/:id/photos/recent', async function (req, res) {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.params.id);
+
+    const allPhotosUnsorted = await Photo.find({ user_id: userId });
+    if (!allPhotosUnsorted || allPhotosUnsorted.length === 0) {
+      return res.status(404).send('No photos found for user.');
+    }
+
+    const recentPhoto = await Photo.findOne({ user_id: userId }).sort({ date_time: -1 });
+    const originalIndex = allPhotosUnsorted.findIndex(photo => photo._id.equals(recentPhoto._id));
+
+    return res.status(200).json({ photo: recentPhoto, originalIndex });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send('Internal Server Error');
+  }
+});
+
+app.get('/user/:id/photos/top-commented', async function (req, res) {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.params.id);
+
+    const allPhotosUnsorted = await Photo.find({ user_id: userId });
+    if (!allPhotosUnsorted || allPhotosUnsorted.length === 0) {
+      return res.status(404).send('No photos found for user.');
+    }
+
+    const topCommentedPhoto = await Photo.aggregate([
+      { $match: { user_id: userId } },
+      { $addFields: { commentCount: { $size: "$comments" } } },
+      { $sort: { commentCount: -1 } },
+      { $limit: 1 }
+    ]);
+    const topCommentPhoto = topCommentedPhoto[0];
+    const originalIndex = allPhotosUnsorted.findIndex(photo => photo._id.equals(topCommentPhoto._id));
+
+    return res.status(200).json({ photo: topCommentPhoto, originalIndex });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send('Internal Server Error');
+  }
+});
+
 const server = app.listen(3000, function () {
   const port = server.address().port;
   console.log(
