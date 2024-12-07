@@ -1,15 +1,32 @@
-import React from "react";
+import React, { useState }  from "react";
 import { AppBar, Toolbar, Typography, Button } from "@mui/material";
 import Switch from '@mui/material/Switch';
+import UserSelectPopup from "../UserSelectPopup";
 
 import "./styles.css";
 
 function TopBar({contentTitle, advanceFeature, onToggle, user, logout, onPhotoUpload}) {
+  const [isUserSelectOpen, setUserSelectOpen] = useState(false);
+  const [file, setFile] = useState(null);
 
   const handleFileChange = (event) => {
-    const file = event.target.files[0];
+    const selectedFile = event.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setUserSelectOpen(true);
+    }
+  };
+
+  const handleUserSelectConfirm = (selectedUsers) => {
     if (file) {
-      onPhotoUpload(file);
+      const formData = new FormData();
+      formData.append("photo", file);
+      if (selectedUsers.length > 0) {
+        formData.append("sharing_list", JSON.stringify(selectedUsers));
+      }
+      onPhotoUpload(formData).finally(() => {
+        setFile(null);
+      });
     }
   };
   
@@ -52,6 +69,12 @@ function TopBar({contentTitle, advanceFeature, onToggle, user, logout, onPhotoUp
           : ''
         }
       </Toolbar>
+      <UserSelectPopup
+        open={isUserSelectOpen}
+        onClose={() => setUserSelectOpen(false)}
+        onConfirm={handleUserSelectConfirm}
+        loggedInUser={user}
+      />
     </AppBar>
   );
 }

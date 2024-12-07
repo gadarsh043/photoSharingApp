@@ -11,6 +11,7 @@ import UserList from "./components/UserList";
 import UserPhotos from "./components/UserPhotos";
 import fetchAxios from "./lib/fetchAxiosData";
 import LoginRegister from './components/LoginRegister';
+import SuccessPopup from "./components/UserSuccessPopup";
 
 
 function PhotoShare() {
@@ -18,6 +19,8 @@ function PhotoShare() {
   const [advanceFeature, setAdvanceFeature] = useState(window.models.advanceModel().advanceFeature);
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const [isSuccessPopupOpen, setSuccessPopupOpen] = useState(false);
+  const [photoUploadMessage, setPhotoUploadMessage] = useState(false);
 
   useEffect(() => {
     async function fetchUserDetails() {
@@ -68,9 +71,7 @@ function PhotoShare() {
     );
   }
 
-  const handlePhotoUpload = async (file) => {
-    const formData = new FormData();
-    formData.append('photo', file);
+  const handlePhotoUpload = async (formData) => {
     try {
       const response = await axios.post('/photos/new', formData, {
         headers: {
@@ -78,8 +79,12 @@ function PhotoShare() {
         }
       });
       console.log('Photo uploaded successfully:', response.data);
-    } catch (error) {
-      console.error('Error uploading photo:', error);
+      setPhotoUploadMessage('Photo uploaded Successfully!');
+      setSuccessPopupOpen(true);
+    } catch (err) {
+      console.error('Error uploading photo:', err);
+      setPhotoUploadMessage('Photo uploaded Failed!');
+      setSuccessPopupOpen(true);
     }
   };
 
@@ -134,6 +139,11 @@ function PhotoShare() {
           </Paper>
         </Grid>
       </Grid>
+      <SuccessPopup
+        open={isSuccessPopupOpen}
+        onClose={() => setSuccessPopupOpen(false)}
+        photoUploadMessage={photoUploadMessage}
+      />
     </div>
   );
 }

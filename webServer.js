@@ -43,6 +43,7 @@ const app = express();
 const session = require("express-session");
 const bodyParser = require("body-parser");
 const multer = require("multer");
+const fs = require('fs');
 const path = require('path');
 
 app.use(session({secret: "secretKey", resave: false, saveUninitialized: false}));
@@ -180,14 +181,25 @@ app.get("/user/:id", async function (request, response) {
  * URL /photosOfUser/:id - Returns the Photos for User (id).
  */
 app.get("/photosOfUser/:id", async function (request, response) {
-  const id = request.params.id;
-  // const photos = models.photoOfUserModel(id);
+  if (!request.session.user) {
+    return response.status(401).send('Unauthorized: User must be logged in to view photos');
+  }
+
+  const loggedInUserId = request.session.user._id;
+  const requestedUserId = request.params.id;
   try {
-    const photos = await Photo.find({ user_id: id }, "_id user_id comments file_name date_time");
+    const photos = await Photo.find({
+      user_id: requestedUserId,
+      $or: [
+        { sharing_list: { $exists: false } },
+        { sharing_list: null },
+        { user_id: loggedInUserId },
+        { sharing_list: loggedInUserId }
+      ]
+    });
     if (photos.length === 0) {
-      console.log("Photos for user with _id:" + id + " not found.");
-      response.status(400).send("Not found");
-      return;
+      console.log("Photos for user with _id:" + requestedUserId + " not found.");
+      return response.status(400).send("Not found");
     }
     const populatedPhotos = await Promise.all(
       photos.map(async (photo) => {
@@ -201,10 +213,10 @@ app.get("/photosOfUser/:id", async function (request, response) {
       })
     );
 
-    response.status(200).json(populatedPhotos);
+    return response.status(200).json(populatedPhotos);
   } catch (err) {
     console.error("Error fetching photos:", err);
-    response.status(400).send("Invalid user ID");
+    return response.status(400).send("Invalid user ID");
   }
 });
 
@@ -308,15 +320,26 @@ app.post('/photos/new', upload.single('photo'), async function (req, res) {
     return res.status(401).send('Unauthorized: User must be logged in to upload photos');
   }
   try {
+    const sharingList = req.body.sharing_list ? JSON.parse(req.body.sharing_list) : null;
     const newPhoto = new Photo({
       file_name: req.file.filename,
       date_time: new Date(),
-      user_id: req.session.user._id
+      user_id: req.session.user._id,
+      sharing_list: sharingList ? sharingList.map(id => new mongoose.Types.ObjectId(id)) : null
     });
     await newPhoto.save();
     return res.status(200).send(newPhoto);
   } catch (err) {
     console.error('Error uploading photo:', err);
+
+    // Clean up the uploaded file if the database operation fails
+    if (req.file && req.file.path) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) {
+          console.error('Error deleting file after upload failure:', unlinkErr);
+        }
+      });
+    }
     return res.status(500).send('Internal Server Error');
   }
 });
