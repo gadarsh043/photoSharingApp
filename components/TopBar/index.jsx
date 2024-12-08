@@ -2,12 +2,14 @@ import React, { useState }  from "react";
 import { AppBar, Toolbar, Typography, Button } from "@mui/material";
 import Switch from '@mui/material/Switch';
 import UserSelectPopup from "../UserSelectPopup";
+import ActivityFeedPopup from "../ActivityFeed";
 
 import "./styles.css";
 
 function TopBar({contentTitle, advanceFeature, onToggle, user, logout, onPhotoUpload}) {
   const [isUserSelectOpen, setUserSelectOpen] = useState(false);
   const [file, setFile] = useState(null);
+  const [isActivityFeedOpen, setActivityFeedOpen] = useState(false);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -53,6 +55,9 @@ function TopBar({contentTitle, advanceFeature, onToggle, user, logout, onPhotoUp
                   onChange={handleFileChange}
                 />
               </Button>
+              <Button variant="contained" component="label" style={{marginLeft: '10px'}} onClick={() => setActivityFeedOpen(!isActivityFeedOpen)}>
+                Activities
+              </Button>
               <button className="logout-button" onClick={() => {logout();}}>
                 Log Out
               </button>
@@ -74,6 +79,10 @@ function TopBar({contentTitle, advanceFeature, onToggle, user, logout, onPhotoUp
         onClose={() => setUserSelectOpen(false)}
         onConfirm={handleUserSelectConfirm}
         loggedInUser={user}
+      />
+      <ActivityFeedPopup
+        isOpen={isActivityFeedOpen}
+        onClose={() => setActivityFeedOpen(false)}
       />
     </AppBar>
   );

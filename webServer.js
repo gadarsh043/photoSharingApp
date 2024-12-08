@@ -53,6 +53,7 @@ app.use(bodyParser.json());
 const User = require("./schema/user.js");
 const Photo = require("./schema/photo.js");
 const SchemaInfo = require("./schema/schemaInfo.js");
+const Activity = require("./schema/activity.js");
 
 // XXX - Your submission should work without this line. Comment out or delete
 // this line for tests and before submission!
@@ -232,6 +233,11 @@ app.post('/admin/login', async function (req, res) {
         return res.status(400).send('Invalid login_name or password');
       }
       req.session.user = { _id: user._id, first_name: user.first_name, last_name: user.last_name };
+      const newActivity = new Activity({
+        activity_type: "User Login",
+        user_id: req.session.user._id,
+      });
+      await newActivity.save();
       return res.status(200).send({
         _id: user._id,
         first_name: user.first_name,
@@ -248,6 +254,7 @@ app.post('/admin/logout', async function (req, res) {
     return res.status(400).send('Not logged in');
   }
   try {
+    const userId = req.session.user._id;
     await new Promise((resolve, reject) => {
       req.session.destroy(err => {
         if (err) {
@@ -257,6 +264,11 @@ app.post('/admin/logout', async function (req, res) {
         }
       });
     });
+    const newActivity = new Activity({
+      activity_type: "User Logout",
+      user_id: userId,
+    });
+    await newActivity.save();
     return res.status(200).send('Logged out');
   } catch (error) {
     return res.status(500).send(error);
@@ -294,6 +306,12 @@ app.post('/commentsOfPhoto/:photo_id', async function (req, res) {
       // Add the comment to the photo's comments array and save
       photo.comments.push(newComment);
       await photo.save();
+      const newActivity = new Activity({
+        activity_type: "New Comment",
+        user_id: req.session.user._id,
+        photo_id: photo._id,
+      });
+      await newActivity.save();      
       return res.status(200).send(newComment); // Return the added comment
     } catch (err) {
       console.error(err);
@@ -328,6 +346,12 @@ app.post('/photos/new', upload.single('photo'), async function (req, res) {
       sharing_list: sharingList ? sharingList.map(id => new mongoose.Types.ObjectId(id)) : null
     });
     await newPhoto.save();
+    const newActivity = new Activity({
+      activity_type: "Photo Upload",
+      user_id: req.session.user._id,
+      photo_id: newPhoto._id,
+    });
+    await newActivity.save();    
     return res.status(200).send(newPhoto);
   } catch (err) {
     console.error('Error uploading photo:', err);
@@ -461,6 +485,64 @@ app.get('/user/:id/photos/top-commented', async function (req, res) {
   } catch (err) {
     console.error(err);
     return res.status(500).send('Internal Server Error');
+  }
+});
+
+app.get("/activities", async function (req, res) {
+  const loggedInUserId = req.session.user._id;
+
+  try {
+    // Step 1: Fetch a larger set of activities
+    const activities = await Activity.find({})
+      .sort({ date_time: -1 })
+      .limit(20)
+      .populate("user_id", "first_name last_name");
+
+    // Step 2: Fetch all related photos in parallel
+    const photoIds = activities.map(activity => activity.photo_id).filter(Boolean);
+    const photos = await Photo.find({ _id: { $in: photoIds } });
+
+    // Create a mapping of photoId -> photo for easy lookup
+    const photoMap = photos.reduce((acc, photo) => {
+      acc[photo._id] = photo;
+      return acc;
+    }, {});
+
+    // Step 3: Filter activities based on visibility rules
+    const visibleActivities = activities.filter(activity => {
+      if (!activity.photo_id) {
+        // Public activities (e.g., login, logout, registration)
+        return true;
+      }
+
+      const photo = photoMap[activity.photo_id];
+      if (!photo) {
+        return false; // Skip if photo is not found
+      }
+
+      // Check visibility for the logged-in user
+      const { sharing_list, user_id } = photo;
+      return (
+        sharing_list === null ||
+        sharing_list.length === 0 ||
+        sharing_list.includes(loggedInUserId.toString()) ||
+        user_id.equals(loggedInUserId)
+      );
+    });
+
+    // Step 4: Map visible activities to include `file_name` if applicable
+    const responseActivities = visibleActivities.map(activity => {
+      const photo = photoMap[activity.photo_id];
+      return {
+        ...activity.toObject(),
+        photo: photo ? { file_name: photo.file_name } : null,
+      };
+    });
+
+    res.status(200).json(responseActivities.slice(0, 5));
+  } catch (err) {
+    console.error("Error fetching activities:", err);
+    res.status(500).send("Internal Server Error");
   }
 });
 
