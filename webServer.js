@@ -381,15 +381,34 @@ app.post('/user', async function (req, res) {
 });
 
 app.get('/user/:id/photos/recent', async function (req, res) {
-  try {
-    const userId = new mongoose.Types.ObjectId(req.params.id);
+  const userId = new mongoose.Types.ObjectId(req.params.id);
+  const loggedInUserId = req.session.user._id;
 
-    const allPhotosUnsorted = await Photo.find({ user_id: userId });
-    if (!allPhotosUnsorted || allPhotosUnsorted.length === 0) {
+  try {
+    const allPhotosUnsorted = await Photo.find({
+      user_id: userId,
+      $or: [
+        { sharing_list: { $exists: false } },
+        { sharing_list: null },
+        { user_id: loggedInUserId },
+        { sharing_list: loggedInUserId }
+      ]
+    });
+
+    if (allPhotosUnsorted.length === 0) {
       return res.status(404).send('No photos found for user.');
     }
 
-    const recentPhoto = await Photo.findOne({ user_id: userId }).sort({ date_time: -1 });
+    const recentPhoto = await Photo.findOne({
+      user_id: userId,
+      $or: [
+        { sharing_list: { $exists: false } },
+        { sharing_list: null },
+        { user_id: loggedInUserId },
+        { sharing_list: loggedInUserId }
+      ]
+    }).sort({ date_time: -1 });
+
     const originalIndex = allPhotosUnsorted.findIndex(photo => photo._id.equals(recentPhoto._id));
 
     return res.status(200).json({ photo: recentPhoto, originalIndex });
@@ -400,24 +419,45 @@ app.get('/user/:id/photos/recent', async function (req, res) {
 });
 
 app.get('/user/:id/photos/top-commented', async function (req, res) {
+  const loggedInUserId = req.session.user._id;
   try {
     const userId = new mongoose.Types.ObjectId(req.params.id);
 
+    // Step 1: Fetch all photos for the user
     const allPhotosUnsorted = await Photo.find({ user_id: userId });
     if (!allPhotosUnsorted || allPhotosUnsorted.length === 0) {
       return res.status(404).send('No photos found for user.');
     }
 
-    const topCommentedPhoto = await Photo.aggregate([
-      { $match: { user_id: userId } },
-      { $addFields: { commentCount: { $size: "$comments" } } },
-      { $sort: { commentCount: -1 } },
-      { $limit: 1 }
-    ]);
-    const topCommentPhoto = topCommentedPhoto[0];
-    const originalIndex = allPhotosUnsorted.findIndex(photo => photo._id.equals(topCommentPhoto._id));
+    // Step 2: Filter photos visible to the logged-in user
+    const visiblePhotos = allPhotosUnsorted.filter(photo => {
+      return (
+        photo.sharing_list === null ||
+        photo.sharing_list.length === 0 ||
+        photo.sharing_list.includes(loggedInUserId.toString()) ||
+        photo.user_id.equals(loggedInUserId)
+      );
+    });
 
-    return res.status(200).json({ photo: topCommentPhoto, originalIndex });
+    if (visiblePhotos.length === 0) {
+      return res.status(404).send('No visible photos found for user.');
+    }
+
+    // Step 3: Find the most commented photo
+    const topCommentedPhoto = visiblePhotos.reduce((maxPhoto, currentPhoto) => {
+      const currentComments = currentPhoto.comments.length;
+      const maxComments = maxPhoto ? maxPhoto.comments.length : 0;
+      return currentComments > maxComments ? currentPhoto : maxPhoto;
+    }, null);
+
+    if (!topCommentedPhoto) {
+      return res.status(404).send('No commented photos found.');
+    }
+
+    // Step 4: Find the original index of the most commented photo
+    const originalIndex = allPhotosUnsorted.findIndex(photo => photo._id.equals(topCommentedPhoto._id));
+
+    return res.status(200).json({ photo: topCommentedPhoto, originalIndex });
   } catch (err) {
     console.error(err);
     return res.status(500).send('Internal Server Error');
