@@ -194,6 +194,7 @@ app.get("/photosOfUser/:id", async function (request, response) {
       $or: [
         { sharing_list: { $exists: false } },
         { sharing_list: null },
+        { sharing_list: { $size: 0 } },
         { user_id: loggedInUserId },
         { sharing_list: loggedInUserId }
       ]
@@ -414,6 +415,7 @@ app.get('/user/:id/photos/recent', async function (req, res) {
       $or: [
         { sharing_list: { $exists: false } },
         { sharing_list: null },
+        { sharing_list: { $size: 0 } },
         { user_id: loggedInUserId },
         { sharing_list: loggedInUserId }
       ]
@@ -428,6 +430,7 @@ app.get('/user/:id/photos/recent', async function (req, res) {
       $or: [
         { sharing_list: { $exists: false } },
         { sharing_list: null },
+        { sharing_list: { $size: 0 } },
         { user_id: loggedInUserId },
         { sharing_list: loggedInUserId }
       ]
@@ -543,6 +546,43 @@ app.get("/activities", async function (req, res) {
   } catch (err) {
     console.error("Error fetching activities:", err);
     res.status(500).send("Internal Server Error");
+  }
+});
+
+app.post('/photos/:photoId/toggleLike', async (req, res) => {
+  const loggedInUserId = req.session.user._id;
+  const { photoId } = req.params;
+
+  try {
+    // Find the photo
+    const photo = await Photo.findById(photoId);
+    if (!photo) {
+      return res.status(404).send('Photo not found');
+    }
+
+    // Check if the user has already liked the photo
+    const alreadyLiked = photo.likes.includes(loggedInUserId);
+
+    if (alreadyLiked) {
+      // Unlike the photo
+      photo.likes = photo.likes.filter(userId => !userId.equals(loggedInUserId));
+    } else {
+      // Like the photo
+      photo.likes.push(loggedInUserId);
+    }
+
+    // Save the changes
+    await photo.save();
+    
+    return res.status(200).send({
+      message: alreadyLiked ? "Photo unliked" : "Photo liked",
+      likes: photo.likes,
+      likeCount: photo.likes.length,
+      liked: !alreadyLiked,
+    });
+  } catch (err) {
+    console.error('Error toggling like:', err);
+    return res.status(500).send('Internal Server Error');
   }
 });
 

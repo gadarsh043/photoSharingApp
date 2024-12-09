@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Typography, Box, Card, CardMedia, CardContent, Divider, Button, TextField } from "@mui/material";
+import { Typography, Box, Card, CardMedia, CardContent, Divider, Button, TextField, IconButton } from "@mui/material";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import axios from "axios";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import fetchAxios from "../../lib/fetchAxiosData";
@@ -93,6 +95,20 @@ function UserPhotos({ advanceFeature, user }) {
     }
   };
 
+  const handleToggleLike = async (photoId, index) => {
+    try {
+      const response = await axios.post(`/photos/${photoId}/toggleLike`);
+      setPhotos((prevPhotos) => {
+        const updatedPhotos = [...prevPhotos];
+        updatedPhotos[index].likes = response.data.likes;
+        updatedPhotos[index].liked = response.data.liked;
+        return updatedPhotos;
+      });
+    } catch (err) {
+      console.error("Error toggling like:", err);
+    }
+  };
+
   if (!photos.length) {
     return <Typography>Loading photos...</Typography>;
   }
@@ -121,6 +137,19 @@ function UserPhotos({ advanceFeature, user }) {
               <Typography variant="subtitle2" color="textSecondary">
                 Uploaded on: {new Date(currentPhoto.date_time).toLocaleString()}
               </Typography>
+              <Box display="flex" alignItems="center" marginTop={2}>
+                <IconButton
+                  onClick={() => handleToggleLike(currentPhoto._id, currentPhotoIndex)}
+                  style={{
+                    color: currentPhoto?.likes?.includes(user._id) ? "red" : "gray", // Check if user ID is in likes array
+                  }}
+                >
+                  {currentPhoto?.likes?.includes(user._id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                </IconButton>
+                <Typography variant="body2" style={{ marginLeft: "8px" }}>
+                  {currentPhoto?.likes?.length} {currentPhoto?.likes?.length === 1 ? "Like" : "Likes"}
+                </Typography>
+              </Box>
               {currentPhoto.comments && currentPhoto.comments.length > 0 && (
                 <Box marginTop={2}>
                   <Typography variant="h6">Comments</Typography>
@@ -181,6 +210,19 @@ function UserPhotos({ advanceFeature, user }) {
               <Typography variant="subtitle2" color="textSecondary" className="uploadedOn">
                 Uploaded on: {new Date(photo.date_time).toLocaleString()}
               </Typography>
+              <Box display="flex" alignItems="center" marginTop={2}>
+                <IconButton
+                  onClick={() => handleToggleLike(photo._id, index)}
+                  style={{
+                    color: photo?.likes?.includes(user._id) ? "red" : "gray",
+                  }}
+                >
+                  {photo?.likes?.includes(user._id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                </IconButton>
+                <Typography variant="body2" style={{ marginLeft: "8px" }}>
+                  {photo?.likes?.length} {photo?.likes?.length === 1 ? "Like" : "Likes"}
+                </Typography>
+              </Box>
               {photo.comments && photo.comments.length > 0 && (
                 <Box marginTop={2}>
                   <Typography variant="h6">Comments</Typography>
