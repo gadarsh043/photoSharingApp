@@ -10,12 +10,12 @@ import {
 import { Link } from "react-router-dom";
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import PhotoCameraBackIcon from '@mui/icons-material/PhotoCameraBack';
+import io from "socket.io-client";
 // import fetchModel from "../../lib/fetchModelData";
 import fetchAxios from "../../lib/fetchAxiosData";
 
 import CommentsPopup from "../CommentsPopup";
 import "./styles.css";
-import io from "socket.io-client";
 
 const socket = io(); // Connect to the WebSocket server
 
