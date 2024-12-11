@@ -506,6 +506,11 @@ app.post('/user', async function (req, res) {
         user_id: newUser._id,
         date_time: new Date()
     });
+    const newActivity = new Activity({
+      activity_type: "Registered as a user",
+      user_id: newUser._id,
+    });
+    await newActivity.save();  
 
     return res.status(200).send({
       login_name: newUser.login_name,
