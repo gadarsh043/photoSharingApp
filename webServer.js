@@ -51,7 +51,14 @@ const multer = require("multer");
 const fs = require('fs');
 const path = require('path');
 
-app.use(session({secret: "secretKey", resave: false, saveUninitialized: false}));
+app.use(session({secret: "secretKey",
+resave: false,
+saveUninitialized: false,
+cookie: {
+  secure: false,
+  httpOnly: true,
+  maxAge: 600000, // Session expiration time (10 minutes in milliseconds)
+}}));
 app.use(bodyParser.json());
 
 // Load the Mongoose schema for User, Photo, and SchemaInfo
@@ -146,6 +153,14 @@ try {
     // If we know understand the parameter we return a (Bad Parameter) (400)
     // status.
     return response.status(400).send("Bad param " + param);
+  }
+});
+
+app.get("/auth/check-session", (req, res) => {
+  if (req.session.user) {
+    res.status(200).send({ user: req.session.user });
+  } else {
+    res.status(401).send("Not authenticated");
   }
 });
 
@@ -332,16 +347,18 @@ app.post('/admin/logout', async function (req, res) {
         }
       });
     });
-    const newActivity = new Activity({
-      activity_type: "User Logout",
-      user_id: userId,
-    });
 
     // Broadcast the new activity
     io.emit("newActivity", {
         activity_type: "User Logout",
-        user_id: req.session.user._id,
+        user_id: userId,
         date_time: new Date()
+    });
+
+    // Save the logout activity
+    const newActivity = new Activity({
+      activity_type: "User Logout",
+      user_id: userId,
     });
     await newActivity.save();
     return res.status(200).send('Logged out');

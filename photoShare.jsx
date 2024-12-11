@@ -38,6 +38,19 @@ function PhotoShare() {
     fetchUserDetails();
   }, [location.pathname]);
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetchAxios("/auth/check-session");
+        setUser(response.data.user);
+      } catch (err) {
+        console.error("Session check failed:", err);
+        setUser(null);
+      }
+    };
+    checkAuth();
+  }, []);
+
   const toggleAdvanceFeature = () => {
     setAdvanceFeature(!advanceFeature);
   };
