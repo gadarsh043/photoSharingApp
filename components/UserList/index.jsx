@@ -15,6 +15,9 @@ import fetchAxios from "../../lib/fetchAxiosData";
 
 import CommentsPopup from "../CommentsPopup";
 import "./styles.css";
+import io from "socket.io-client";
+
+const socket = io(); // Connect to the WebSocket server
 
 function UserList({ advanceFeature }) {
   const [users, setUser] = useState([]);
@@ -63,6 +66,26 @@ function UserList({ advanceFeature }) {
       }
     };
     getUserList();
+    socket.on("newActivity", (activity) => {
+      setUser((prevUsers) => prevUsers.map((user) => (user._id === activity.user_id
+            ? {
+                ...user,
+                lastActivity: {
+                  type: activity.activity_type,
+                  date_time: activity.date_time,
+                  thumbnail: activity.photo_id ? activity.photo_id : null,
+                },
+              }
+            : user)
+        )
+      );
+    });
+  
+    // Cleanup on unmount
+    return () => {
+      socket.off("newActivity");
+      socket.disconnect();
+    };
   }, []);
 
   const handleOpenCommentsPopup = (userId) => {
@@ -84,6 +107,18 @@ function UserList({ advanceFeature }) {
           <div key={user._id} className="main-div">
             <ListItem component={Link} to={`/users/${user._id}`} className="userList-item" >
               <ListItemText primary={`${user.first_name} ${user.last_name}`} />
+              {user.lastActivity && (
+                  <div style={{display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'flex-start', backgroundColor: '#B8CAE4', padding: '5px', borderRadius: '5px'}}>
+                    <div className="user-activity">
+                      {(user.lastActivity.type === "Photo Upload" || user.lastActivity.type === "New Comment") && (
+                          <img src={`/images/${user.lastActivity.thumbnail}`} alt="thumbnail" />
+                      )}
+                      <span>{user.lastActivity.type}</span>
+                      <br />
+                    </div>
+                    <small>{new Date(user.lastActivity.date_time).toLocaleString()}</small>
+                  </div>
+              )}
             </ListItem>
             {advanceFeature && (
               <>

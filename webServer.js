@@ -38,6 +38,11 @@ mongoose.Promise = require("bluebird");
 
 const express = require("express");
 const app = express();
+const http = require("http");
+const socketIO = require("socket.io");
+
+const server = http.createServer(app);
+const io = socketIO(server);
 
 
 const session = require("express-session");
@@ -148,13 +153,68 @@ try {
  * URL /user/list - Returns all the User objects.
  */
 app.get("/user/list", async function (request, response) {
-  // response.status(200).send(models.userListModel());
+  if (!request.session.user) {
+    return response.status(401).send("Unauthorized: Please log in.");
+  }
+
+  const loggedInUserId = request.session.user._id;
   try {
+    // Step 1: Fetch all users
     const users = await User.find({}, "_id first_name last_name");
-    response.status(200).json(users);
+
+    // Step 2: Fetch the most recent activity for each user
+    const activities = await Activity.aggregate([
+      { $sort: { date_time: -1 } }, // Sort activities by latest first
+      { $group: { _id: "$user_id", activity: { $first: "$$ROOT" } } }, // Group by user and pick the latest activity
+    ]);
+
+    // Step 3: Fetch all related photos in parallel
+    const photoIds = activities
+      .map((item) => item.activity.photo_id)
+      .filter(Boolean); // Collect only valid photo IDs
+    const photos = await Photo.find(
+      {
+        _id: { $in: photoIds },
+        $or: [
+          { sharing_list: { $exists: false } },
+          { sharing_list: null },
+          { sharing_list: { $size: 0 } },
+          { user_id: loggedInUserId },
+          { sharing_list: loggedInUserId },
+        ],
+      },
+      "file_name _id"
+    );
+
+    const photoMap = photos.reduce((map, photo) => {
+      map[photo._id] = photo.file_name;
+      return map;
+    }, {});
+
+    // Step 4: Build the response
+    const userList = users.map((user) => {
+      const activity = activities.find((item) => item._id.equals(user._id));
+      const activityDetails = activity
+        ? {
+            type: activity.activity.activity_type,
+            date_time: activity.activity.date_time,
+            thumbnail: photoMap[activity.activity.photo_id] || null,
+          }
+        : null;
+
+      return {
+        _id: user._id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        lastActivity: activityDetails,
+      };
+    });
+
+    // Step 5: Send the response
+    return response.status(200).json(userList);
   } catch (err) {
     console.error("Error fetching user list:", err);
-    response.status(400).send(err);
+    return response.status(500).send("Internal Server Error");
   }
 });
 
@@ -239,6 +299,13 @@ app.post('/admin/login', async function (req, res) {
         user_id: req.session.user._id,
       });
       await newActivity.save();
+
+      // Broadcast the new activity
+      io.emit("newActivity", {
+          activity_type: "User Login",
+          user_id: req.session.user._id,
+          date_time: new Date()
+      });
       return res.status(200).send({
         _id: user._id,
         first_name: user.first_name,
@@ -269,6 +336,13 @@ app.post('/admin/logout', async function (req, res) {
       activity_type: "User Logout",
       user_id: userId,
     });
+
+    // Broadcast the new activity
+    io.emit("newActivity", {
+        activity_type: "User Logout",
+        user_id: req.session.user._id,
+        date_time: new Date()
+    });
     await newActivity.save();
     return res.status(200).send('Logged out');
   } catch (error) {
@@ -279,7 +353,7 @@ app.post('/admin/logout', async function (req, res) {
 // POST endpoint to add a comment to a photo
 app.post('/commentsOfPhoto/:photo_id', async function (req, res) {
     const { photo_id } = req.params;
-    const { comment } = req.body;
+    const { comment, fileName } = req.body;
 
     // Check if user is logged in
     if (!req.session.user) {
@@ -311,6 +385,14 @@ app.post('/commentsOfPhoto/:photo_id', async function (req, res) {
         activity_type: "New Comment",
         user_id: req.session.user._id,
         photo_id: photo._id,
+      });
+
+      // Broadcast the new activity
+      io.emit("newActivity", {
+          activity_type: "New Comment",
+          user_id: req.session.user._id,
+          date_time: new Date(),
+          photo_id: fileName,
       });
       await newActivity.save();      
       return res.status(200).send(newComment); // Return the added comment
@@ -353,6 +435,14 @@ app.post('/photos/new', upload.single('photo'), async function (req, res) {
       photo_id: newPhoto._id,
     });
     await newActivity.save();    
+
+    // Broadcast the new activity
+    io.emit("newActivity", {
+        activity_type: "Photo Upload",
+        user_id: req.session.user._id,
+        photo_id: req.file.filename,
+        date_time: new Date()
+    });
     return res.status(200).send(newPhoto);
   } catch (err) {
     console.error('Error uploading photo:', err);
@@ -392,6 +482,13 @@ app.post('/user', async function (req, res) {
     });
 
     await newUser.save();
+    
+    // Broadcast the new activity
+    io.emit("newActivity", {
+        activity_type: "Registered as a user",
+        user_id: newUser._id,
+        date_time: new Date()
+    });
 
     return res.status(200).send({
       login_name: newUser.login_name,
@@ -586,7 +683,7 @@ app.post('/photos/:photoId/toggleLike', async (req, res) => {
   }
 });
 
-const server = app.listen(3000, function () {
+server.listen(3000, function () {
   const port = server.address().port;
   console.log(
     "Listening at http://localhost:" +

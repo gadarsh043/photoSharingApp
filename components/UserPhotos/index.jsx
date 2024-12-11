@@ -55,7 +55,7 @@ function UserPhotos({ advanceFeature, user }) {
     }));
   };
 
-  const handleAddComment = async (photoId, index) => {
+  const handleAddComment = async (photoId, index, file_name) => {
     if (!newComments[photoId]?.trim()) {
       setCommentErrors(prevErrors => ({
         ...prevErrors,
@@ -64,7 +64,7 @@ function UserPhotos({ advanceFeature, user }) {
       return;
     }
     try {
-      let response = await axios.post(`/commentsOfPhoto/${photoId}`, { comment: newComments[photoId] });
+      let response = await axios.post(`/commentsOfPhoto/${photoId}`, { comment: newComments[photoId], fileName: file_name  });
       setNewComments(prevComments => ({
         ...prevComments,
         [photoId]: ''
@@ -252,7 +252,7 @@ function UserPhotos({ advanceFeature, user }) {
                   error={Boolean(commentErrors[photo._id])}
                   helperText={commentErrors[photo._id]}
                 />
-                <Button variant="contained" color="primary" onClick={() => handleAddComment(photo._id, index)} sx={{ marginTop: 1 }}>
+                <Button variant="contained" color="primary" onClick={() => handleAddComment(photo._id, index, photo.file_name)} sx={{ marginTop: 1 }}>
                   Submit Comment
                 </Button>
               </Box>
